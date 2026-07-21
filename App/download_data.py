@@ -22,6 +22,28 @@ def download_gold_data():
     # 10 years of data is enough for our analysis
     )
 
+    if isinstance(data.columns, pd.MultiIndex):
+    data.columns = data.columns.droplevel(1)
+
+
+    def validate_dataset(data: pd.DataFrame) -> None:
+        print("\n" + "=" * 40)
+        print("DATASET VALIDATION REPORT")
+        print("=" * 40)
+
+        (rows, cols) = data.shape
+        print(f"rows: {rows}")
+        print(f"columns: {cols}")
+        
+        missing_values = data.isnull().sum()
+        print("\nMissing values:")
+        print(missing_values)
+
+        if data.empty:
+            raise ValueError("No data was found/downloaded.")
+
+    validate_dataset(data)
+
     if data.empty:
         raise ValueError("No data was found/downloaded.")
     print(f"Downloaded {len(data)} rows of data for {ticker} from Yahoo Finance.")
@@ -37,5 +59,5 @@ def download_gold_data():
     data.to_csv(csv_file)
     print(f"\nDataset saved to {csv_file}")
 
-    if  __name_ == "_main_":
-        download_gold_data()
+if  __name__ == "__main__":
+    download_gold_data()
