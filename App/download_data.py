@@ -1,53 +1,69 @@
 from pathlib import Path
 
-#external libraries imports
+# External libraries
 import pandas as pd
 import yfinance as yf
-#----------------------------
 
 
 def download_gold_data():
     """
-    Download historical OHLC data for Gold
-    from Yahoo Finance. It's good to note that i choose Yahoo Finance because it is simpler  to use
+    Download historical OHLC data for Gold from Yahoo Finance.
+
+    We use the Gold Futures ticker (GC=F) as a proxy for gold price data,
+    since Yahoo Finance does not provide XAUUSD directly through this ticker.
     """
 
-    ticker = "GC=F" #Yahoo Finance does not makes available directly XAUUSD, so we have to use the Gold Futures instead 
+    ticker = "GC=F"
 
-    data = yf.download(  
-    ticker,
-    start="2015-01-01",
-    progress=False,
-    auto_adjust=False
-    # 10 years of data is enough for our analysis
+    # Download historical data
+    data = yf.download(
+        ticker,
+        start="2015-01-01",
+        progress=False,
+        auto_adjust=False
     )
 
+    # Flatten yfinance MultiIndex columns
     if isinstance(data.columns, pd.MultiIndex):
-    data.columns = data.columns.droplevel(1)
+        data.columns = data.columns.droplevel(1)
 
+    # Make sure the index has a proper name
+    data.index.name = "Date"
 
     def validate_dataset(data: pd.DataFrame) -> None:
+        """
+        Validate the downloaded dataset.
+        """
+
         print("\n" + "=" * 40)
         print("DATASET VALIDATION REPORT")
         print("=" * 40)
 
-        (rows, cols) = data.shape
-        print(f"rows: {rows}")
-        print(f"columns: {cols}")
-        
+        rows, cols = data.shape
+
+        print(f"Rows: {rows}")
+        print(f"Columns: {cols}")
+
         missing_values = data.isnull().sum()
+
         print("\nMissing values:")
         print(missing_values)
 
         if data.empty:
             raise ValueError("No data was found/downloaded.")
 
+    # Validate downloaded data
     validate_dataset(data)
 
-    if data.empty:
-        raise ValueError("No data was found/downloaded.")
-    print(f"Downloaded {len(data)} rows of data for {ticker} from Yahoo Finance.")
+    print(
+        f"\nDownloaded {len(data)} rows of data "
+        f"for {ticker} from Yahoo Finance."
+    )
+
+    print("\nFirst rows:")
     print(data.head())
+
+    print("\nLast rows:")
     print(data.tail())
 
     # Save the data to a CSV file
@@ -57,7 +73,11 @@ def download_gold_data():
     csv_file = output_path / "xauusd.csv"
 
     data.to_csv(csv_file)
+
     print(f"\nDataset saved to {csv_file}")
 
-if  __name__ == "__main__":
+
+if __name__ == "__main__":
+    print("SCRIPT STARTED")
+
     download_gold_data()
