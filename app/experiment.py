@@ -20,14 +20,22 @@ from sklearn.metrics import (
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
-from features import create_features
+from features import FEATURE_COLUMNS, create_features
 
 
 def load_dataset():
     """
-    Load the raw gold dataset and create the features
-    used by the machine learning models.
+    Load the raw gold dataset, create predictive features,
+    and create the target variable.
+
+    The target represents the direction of the next trading day:
+    1 = next day's closing price is higher
+    0 = next day's closing price is equal or lower
     """
+
+    # =========================================================
+    # 1. LOAD RAW DATA
+    # =========================================================
 
     data_path = Path("data/raw/xauusd.csv")
 
@@ -37,7 +45,39 @@ def load_dataset():
         parse_dates=True,
     )
 
+    # =========================================================
+    # 2. CREATE FEATURES
+    # =========================================================
+
     dataset = create_features(data)
+
+    # =========================================================
+    # 3. CREATE TARGET
+    # =========================================================
+
+    # Compare today's closing price with tomorrow's closing price.
+    #
+    # shift(-1) moves the next day's Close value
+    # to the current row.
+    #
+    # Example:
+    #
+    # Today's Close = 4000
+    # Tomorrow's Close = 4050
+    #
+    # 4050 > 4000
+    # target = 1
+
+    dataset["target"] = (
+        dataset["Close"].shift(-1)
+        > dataset["Close"]
+    ).astype(int)
+
+    # The final row does not have a future closing price,
+    # so its target cannot be calculated.
+    dataset = dataset.dropna(
+        subset=["target"]
+    )
 
     return dataset
 
@@ -58,19 +98,34 @@ def evaluate_model(
     print(f"MODEL: {model_name}")
     print("=" * 50)
 
-    # Train the model
+    # =========================================================
+    # 1. TRAIN MODEL
+    # =========================================================
+
     model.fit(
         X_train,
         y_train,
     )
 
-    # Generate class predictions
-    predictions = model.predict(X_test)
+    print("Model training completed.")
 
-    # Generate probability predictions
-    probabilities = model.predict_proba(X_test)[:, 1]
+    # =========================================================
+    # 2. GENERATE PREDICTIONS
+    # =========================================================
 
-    # Calculate metrics
+    predictions = model.predict(
+        X_test
+    )
+
+    # Probability of the positive class (1)
+    probabilities = model.predict_proba(
+        X_test
+    )[:, 1]
+
+    # =========================================================
+    # 3. CALCULATE METRICS
+    # =========================================================
+
     accuracy = accuracy_score(
         y_test,
         predictions,
@@ -99,12 +154,29 @@ def evaluate_model(
         zero_division=0,
     )
 
-    # Print results
-    print(f"Accuracy:  {accuracy:.4f}")
-    print(f"ROC-AUC:   {roc_auc:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall:    {recall:.4f}")
-    print(f"F1-score:  {f1:.4f}")
+    # =========================================================
+    # 4. PRINT RESULTS
+    # =========================================================
+
+    print(
+        f"Accuracy:  {accuracy:.4f}"
+    )
+
+    print(
+        f"ROC-AUC:   {roc_auc:.4f}"
+    )
+
+    print(
+        f"Precision: {precision:.4f}"
+    )
+
+    print(
+        f"Recall:    {recall:.4f}"
+    )
+
+    print(
+        f"F1-score:  {f1:.4f}"
+    )
 
     return {
         "model": model_name,
@@ -130,27 +202,47 @@ def run_experiment():
     )
 
     # =========================================================
-    # 2. DEFINE FEATURES
+    # 2. DEFINE FEATURES AND TARGET
     # =========================================================
 
-    feature_columns = [
-        "return_1d",
-        "return_5d",
-        "price_vs_sma_10",
-        "price_vs_sma_30",
-        "volatility_10",
-        "volume_change",
-    ]
+    # FEATURE_COLUMNS comes directly from features.py.
+    #
+    # This means that if we add or remove features in
+    # features.py, the experiment automatically uses
+    # the updated feature set.
 
     X = dataset[
-        feature_columns
+        FEATURE_COLUMNS
     ]
 
-    y = dataset["target"]
+    y = dataset[
+        "target"
+    ]
+
+    print("\n" + "=" * 50)
+    print("FEATURES USED")
+    print("=" * 50)
+
+    print(
+        FEATURE_COLUMNS
+    )
+
+    print("\nTarget distribution:")
+
+    print(
+        y.value_counts()
+    )
 
     # =========================================================
     # 3. TIME-BASED TRAIN / TEST SPLIT
     # =========================================================
+
+    # We use chronological splitting instead of random splitting.
+    #
+    # The model trains on older data and is tested on newer data.
+    #
+    # This better represents a real-world financial prediction
+    # scenario.
 
     split_index = int(
         len(dataset) * 0.8
@@ -242,7 +334,7 @@ def run_experiment():
     }
 
     # =========================================================
-    # 5. RUN EXPERIMENTS
+    # 5. RUN MODEL EXPERIMENTS
     # =========================================================
 
     results = []
@@ -258,11 +350,16 @@ def run_experiment():
             y_test,
         )
 
-        results.append(result)
+        results.append(
+            result
+        )
 
     # =========================================================
     # 6. BASELINE
     # =========================================================
+
+    # The baseline always predicts the most common
+    # class found in the training dataset.
 
     majority_class = y_train.mode()[0]
 
@@ -273,6 +370,20 @@ def run_experiment():
     baseline_accuracy = accuracy_score(
         y_test,
         baseline_predictions,
+    )
+
+    print("\n" + "=" * 50)
+    print("BASELINE")
+    print("=" * 50)
+
+    print(
+        f"Baseline strategy: "
+        f"Always predict {majority_class}"
+    )
+
+    print(
+        f"Baseline accuracy: "
+        f"{baseline_accuracy:.4f}"
     )
 
     results.append(

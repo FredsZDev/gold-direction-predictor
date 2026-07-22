@@ -23,6 +23,10 @@ def download_gold_data():
         auto_adjust=False
     )
 
+    # Handle case where download returns None
+    if data is None or data.empty:
+        raise ValueError("No data was found/downloaded.")
+
     # Flatten yfinance MultiIndex columns
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = data.columns.droplevel(1)
